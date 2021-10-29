@@ -7,8 +7,6 @@
 long long A = 125;
 long long B = 0;
 
-using namespace std;
-
 
 void interrupt(*old)(...);
 
