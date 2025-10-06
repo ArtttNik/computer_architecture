@@ -23,12 +23,12 @@ unsigned int rotate(unsigned int value, unsigned int count, int dir) {
         mov result, eax
 
             test eax, eax
-            sete zf
+            
 
-            setc cf
+         
     }
 
-    cout << "ZF = " << zf << ", CF = " << cf << endl;
+    
     return result;
 }
 
@@ -36,13 +36,13 @@ int main() {
     unsigned int x = 0x91;
 
     cout << hex;
-    cout << "Initial: " << x << endl;
+    cout << x << endl;
 
     unsigned int res1 = rotate(x, 1, 0);
-    cout << "After rotate left: " << res1 << endl;
+    cout <<  res1 << endl;
 
     unsigned int res2 = rotate(x, 1, 1);
-    cout << "After rotate right: " << res2 << endl;
+    cout << res2 << endl;
 
     return 0;
 }
