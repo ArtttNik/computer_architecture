@@ -1,16 +1,8 @@
 ﻿#include <iostream>
 using namespace std;
 
-void shift_stack(long long int a, long long int b, long long int& mul)
+void shift_stack(long long int a, long long int b, long long int& result)
 {
-	//стек
-	//...
-	//ip
-	//bp = sp
-	//8 байт
-	//a 8байт                   слово1 и слово 2  слово11 слово22                1*11 1*22 2*11 2*22
-	//b 8байт
-	//mul 8байт                   eax * ebx = eax:edx
 	__asm
 	{
 		mov eax, [ebp + 8]
@@ -44,13 +36,11 @@ void shift_reg()
 {
 	__asm
 	{
-
 		push edx
 		push ebx
-		//ebx и edx - заняты
 
-		mov eax, [ebx] //низ а
-		mov ecx, [edx] // низ b
+		mov eax, [ebx]
+		mov ecx, [edx]
 		mul ecx
 		mov[esi], eax
 		mov[esi + 4], edx
@@ -97,7 +87,7 @@ void shift_reg()
 
 long long int globA = 0;
 long long int globB = 0;
-long long int* globMul = 0;
+long long int* globResult = 0;
 
 void shift_global()
 {
@@ -105,11 +95,11 @@ void shift_global()
 	{
 		lea ebx, globA
 		lea edx, globB
-		mov esi, globMul
+		mov esi, globResult
 		push edx
 		push ebx
-		mov eax, [ebx] //низ а
-		mov ecx, [edx] // низ b
+		mov eax, [ebx]
+		mov ecx, [edx]
 		mul ecx
 		mov[esi], eax
 		mov[esi + 4], edx
@@ -157,31 +147,29 @@ void shift_global()
 int main()
 {
 	setlocale(LC_ALL, "rus");
-	long long int a = 0x0F00000000F00007; //двойное слово - 32 бита
-	long long int b = 0x00000000000ACF02;
-	long long int mul = 0;
-	//передача через стек
-	shift_stack(a, b, mul);
-	cout << "Умножение через стек: " << mul << endl;
-	mul = 0;
+	long long int a = 987654321;
+	long long int b = 123456789;
+	long long int result = 0;
+	shift_stack(a, b, result);
+	cout << "Умножение через стек: " << result << endl;
+	result = 0;
 
-	//передача через регистры
 	__asm
 	{
 		lea ebx, a
 		lea edx, b
-		lea esi, mul
+		lea esi, result
 	}
 	shift_reg();
-	cout << "Умножение через регистры: " << mul << endl;
-	mul = 0;
+	cout << "Умножение через регистры: " << result << endl;
+	result = 0;
 
-	//передача через глобальные переменные
+
 	globA = a;
 	globB = b;
-	globMul = &mul;
+	globResult = &result;
 	shift_global();
-	cout << "Умножение через глобальные переменные: " << mul << endl;
+	cout << "Умножение через глобальные переменные: " << result << endl;
 	
 
 
