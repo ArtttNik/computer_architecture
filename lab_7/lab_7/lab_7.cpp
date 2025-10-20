@@ -5,10 +5,10 @@ using namespace std;
 
 int main()
 {
-	float a = 1;
-	float b = 3;
-	float c = 5;
-	float sum = 0;
+	float a = 1.1;
+	float b = 3.3;
+	float c = 5.5;
+	float sum = 0.0;
 
 	__asm
 	{
@@ -31,8 +31,8 @@ int main()
 	cout << "2. sum = " << sum << endl;
 
 	int ctrl = 0x027F;
-	a = 5;
-	b = 0;
+	a = 5.5;
+	b = 0.0;
 
 	__asm
 	{
