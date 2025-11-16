@@ -1,13 +1,12 @@
 .data
-
 task_count: .word 3
-quantum: .word 2
+quantum: .word 8
 
 queue: .word -1, -1, -1
 queue_size: .word 0
 
 current_task: .word -1
-time_remaining: .word 0s
+time_remaining: .word 0
 
 newline: .string "\n"
 task_msg: .string "Task "
