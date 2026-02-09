@@ -70,17 +70,17 @@ int main()
     int height = bi.biHeight;
 
     int inRowSize  = ((width + 1) / 2 + 3) & ~3;
-    int outRowSize = (width * 2 + 3) & ~3;
+    int outRowSize = (width * 3 + 3) & ~3;
 
     BYTE* inRow = new BYTE[inRowSize];
-    WORD* outRow1 = new WORD[width];
-    WORD* outRow2 = new WORD[width];
+    BYTE* outRow1 = new BYTE[width * 3];
+    BYTE* outRow2 = new BYTE[width * 3];
 
     BITMAPFILEHEADER bfOut = bf;
     BITMAPINFOHEADER biOut = bi;
 
     bfOut.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-    biOut.biBitCount = 16;
+    biOut.biBitCount = 24;
     biOut.biCompression = BI_RGB;
     biOut.biSizeImage = outRowSize * height;
     bfOut.bfSize = bfOut.bfOffBits + biOut.biSizeImage;
@@ -107,16 +107,19 @@ int main()
 
             RGBQUAD c = palette[idx1];
 
-            WORD r1 = (c.rgbRed   >> 3) & 0x1F;
-            WORD g1 = (c.rgbGreen >> 3) & 0x1F;
-            WORD bl1 = (c.rgbBlue >> 3) & 0x1F;
-            outRow1[px] = (r1 << 10) | (g1 << 5) | bl1;
+            outRow1[px * 3] = c.rgbBlue;
+            outRow1[px * 3 + 1] = c.rgbGreen;
+            outRow1[px * 3 + 2] = c.rgbRed;
 
             int brightness = (c.rgbRed * 299 + c.rgbGreen * 587 + c.rgbBlue * 114) / 1000;
             if (brightness > threshold) {
-                outRow2[px] = (31 << 10) | (31 << 5) | 31;
+                outRow2[px * 3] = 255;
+                outRow2[px * 3 + 1] = 255;
+                outRow2[px * 3 + 2] = 255;
             } else {
-                outRow2[px] = 0;
+                outRow2[px * 3] = 0;
+                outRow2[px * 3 + 1] = 0;
+                outRow2[px * 3 + 2] = 0;
             }
 
             px++;
@@ -125,28 +128,31 @@ int main()
             {
                 c = palette[idx2];
 
-                r1 = (c.rgbRed   >> 3) & 0x1F;
-                g1 = (c.rgbGreen >> 3) & 0x1F;
-                bl1 = (c.rgbBlue >> 3) & 0x1F;
-                outRow1[px] = (r1 << 10) | (g1 << 5) | bl1;
+                outRow1[px * 3] = c.rgbBlue;
+                outRow1[px * 3 + 1] = c.rgbGreen;
+                outRow1[px * 3 + 2] = c.rgbRed;
 
                 brightness = (c.rgbRed * 299 + c.rgbGreen * 587 + c.rgbBlue * 114) / 1000;
                 if (brightness > threshold) {
-                    outRow2[px] = (31 << 10) | (31 << 5) | 31;
+                    outRow2[px * 3] = 255;
+                    outRow2[px * 3 + 1] = 255;
+                    outRow2[px * 3 + 2] = 255;
                 } else {
-                    outRow2[px] = 0;
+                    outRow2[px * 3] = 0;
+                    outRow2[px * 3 + 1] = 0;
+                    outRow2[px * 3 + 2] = 0;
                 }
 
                 px++;
             }
         }
 
-        WriteFile(hOut1, outRow1, width * 2, &rw, NULL);
-        WriteFile(hOut2, outRow2, width * 2, &rw, NULL);
+        WriteFile(hOut1, outRow1, width * 3, &rw, NULL);
+        WriteFile(hOut2, outRow2, width * 3, &rw, NULL);
 
         BYTE padding[4] = {0};
-        WriteFile(hOut1, padding, outRowSize - width * 2, &rw, NULL);
-        WriteFile(hOut2, padding, outRowSize - width * 2, &rw, NULL);
+        WriteFile(hOut1, padding, outRowSize - width * 3, &rw, NULL);
+        WriteFile(hOut2, padding, outRowSize - width * 3, &rw, NULL);
     }
 
     delete[] inRow;
@@ -159,8 +165,8 @@ int main()
     CloseHandle(hOut2);
 
     cout << "\nConversion completed successfully!\n";
-    cout << "o1.bmp - simple 4->16 bit conversion\n";
-    cout << "o2.bmp - 4->16 bit conversion with binarization (threshold="
+    cout << "o1.bmp - simple 4->24 bit conversion\n";
+    cout << "o2.bmp - 4->24 bit conversion with binarization (threshold="
          << threshold << ")\n";
 
     system("pause");
