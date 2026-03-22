@@ -5,7 +5,6 @@ blur_value = 1
 
 def on_trackbar(val):
     global blur_value
-    # теперь максимум 50 -> ядро до 101
     blur_value = val * 2 + 1
 
 def sharpen(frame):
@@ -20,9 +19,7 @@ if not capture.isOpened():
     print("Камера не найдена")
     exit()
 
-cv2.namedWindow("Filter", cv2.WINDOW_AUTOSIZE)
-
-# максимум увеличен до 50
+cv2.namedWindow("Filter")
 cv2.createTrackbar("Blur (0=sharp)", "Filter", 0, 50, on_trackbar)
 
 while True:
@@ -38,9 +35,10 @@ while True:
     combined = np.hstack([frame, result])
     cv2.imshow("Filter", combined)
 
-    # фикс Q на Windows
-    key = cv2.waitKey(1)
-    if key == ord('q') or key == ord('Q') or key == 27:
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord('q'):
+        print("Exit pressed")
         break
 
 capture.release()
