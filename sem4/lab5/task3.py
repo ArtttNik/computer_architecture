@@ -1,154 +1,182 @@
 import cv2
 import numpy as np
+import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision as mp_vision
+import urllib.request
+import os
+import sys
 
-# ─── Загрузка шаблона ───────────────────────────────────────────────────────
-template = cv2.imread('template.png')
-if template is None:
-    print("Файл template.png не найден")
-    exit()
+MODEL_PATH = "hand_landmarker.task"
+MODEL_URL  = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 
-tmpl_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+if not os.path.exists(MODEL_PATH):
+    print("Скачиваю модель hand_landmarker.task (~9 МБ)...")
+    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    print("Готово.")
 
-# ─── Захват камеры ───────────────────────────────────────────────────────────
+FINGER_TIPS  = [4, 8, 12, 16, 20]
+FINGER_MIDS  = [3, 7, 11, 15, 19]
+FINGER_BASES = [2, 6, 10, 14, 18]
+WRIST        = 0
+
+def landmarks_to_vector(lms):
+    pts = np.array([[lm.x, lm.y] for lm in lms], dtype=np.float32)
+    wrist = pts[WRIST]
+    scale = np.linalg.norm(pts[9] - wrist) + 1e-6
+    pts   = (pts - wrist) / scale
+
+    features = []
+    for tip in FINGER_TIPS:
+        v = pts[tip]
+        n = np.linalg.norm(v) + 1e-6
+        features.extend((v / n).tolist())
+    for base, mid, tip in zip(FINGER_BASES, FINGER_MIDS, FINGER_TIPS):
+        v1 = pts[mid] - pts[base]
+        v2 = pts[tip] - pts[mid]
+        n1 = np.linalg.norm(v1) + 1e-6
+        n2 = np.linalg.norm(v2) + 1e-6
+        features.append(float(np.clip(np.dot(v1/n1, v2/n2), -1, 1)))
+    for i in range(len(FINGER_TIPS)):
+        for j in range(i+1, len(FINGER_TIPS)):
+            features.append(float(np.linalg.norm(pts[FINGER_TIPS[i]] - pts[FINGER_TIPS[j]])))
+
+    vec = np.array(features, dtype=np.float32)
+    return vec / (np.linalg.norm(vec) + 1e-6)
+
+def make_detector(running_mode, num_hands=1, det_conf=0.4):
+    base = mp_python.BaseOptions(model_asset_path=MODEL_PATH)
+    opts = mp_vision.HandLandmarkerOptions(
+        base_options=base,
+        num_hands=num_hands,
+        min_hand_detection_confidence=det_conf,
+        min_hand_presence_confidence=det_conf,
+        min_tracking_confidence=det_conf,
+        running_mode=running_mode,
+    )
+    return mp_vision.HandLandmarker.create_from_options(opts)
+
+def bgr_to_mp(bgr):
+    return mp.Image(image_format=mp.ImageFormat.SRGB,
+                    data=cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+
+template_img = cv2.imread("template.png")
+if template_img is None:
+    print("Файл template1.png не найден")
+    sys.exit(1)
+
+det_static   = make_detector(mp_vision.RunningMode.IMAGE, num_hands=1, det_conf=0.3)
+res_tmpl     = det_static.detect(bgr_to_mp(template_img))
+if not res_tmpl.hand_landmarks:
+    res_tmpl = det_static.detect(bgr_to_mp(cv2.flip(template_img, 1)))
+det_static.close()
+
+if not res_tmpl.hand_landmarks:
+    print("ОШИБКА: рука в template1.png не найдена.")
+    print("Рука должна быть чётко видна на светлом фоне.")
+    sys.exit(1)
+
+template_vec = landmarks_to_vector(res_tmpl.hand_landmarks[0])
+print(f"Шаблон загружен OK, точек: {len(res_tmpl.hand_landmarks[0])}")
+
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
-    print("Камера не найдена")
-    exit()
+    print("Камера не найдена"); sys.exit(1)
 
 grabbed, frame = cap.read()
 fh, fw = frame.shape[:2]
-th, tw = tmpl_gray.shape[:2]
+print(f"Камера: {fw}x{fh}")
+print("Q/Esc — выход   S — сохранить кадр")
 
-print(f"Кадр камеры: {fw}x{fh}")
-print(f"Шаблон до масштабирования: {tw}x{th}")
-
-# Если шаблон больше 1/3 кадра — уменьшаем
-max_tw = fw // 3
-max_th = fh // 3
-if tw > max_tw or th > max_th:
-    scale = min(max_tw / tw, max_th / th)
-    tmpl_gray = cv2.resize(tmpl_gray, (int(tw * scale), int(th * scale)))
-    template  = cv2.resize(template,  (int(tw * scale), int(th * scale)))
-    th, tw = tmpl_gray.shape[:2]
-    print(f"Шаблон после масштабирования: {tw}x{th}")
-
-print(f"Шаблон итого: {tw}x{th}")
-
-WINDOW = "Template Search"
+WINDOW = "Gesture Search"
 cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
-threshold_val = [30]  # начинаем с низкого порога
+threshold_val = [70]
+cv2.createTrackbar("Threshold %", WINDOW, 70, 99,
+                   lambda v: threshold_val.__setitem__(0, max(v, 1)))
 
-def on_threshold(val):
-    threshold_val[0] = max(val, 1)
+THUMB_H = 100
+THUMB_W = int(template_img.shape[1] * THUMB_H / template_img.shape[0])
+tmpl_thumb = cv2.resize(template_img, (THUMB_W, THUMB_H))
 
-cv2.createTrackbar("Threshold %", WINDOW, 30, 100, on_threshold)
+HAND_CONNECTIONS = [
+    (0,1),(1,2),(2,3),(3,4),
+    (0,5),(5,6),(6,7),(7,8),
+    (5,9),(9,10),(10,11),(11,12),
+    (9,13),(13,14),(14,15),(15,16),
+    (13,17),(17,18),(18,19),(19,20),(0,17)
+]
 
-
-def build_heatmap(result, frame_shape):
-    norm = cv2.normalize(result, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-    heatmap = cv2.resize(norm, (frame_shape[1], frame_shape[0]))
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    return heatmap
-
-
-def nms(boxes, overlap_thresh=0.3):
-    if not boxes:
-        return []
-    boxes = np.array(boxes, dtype=float)
-    picked = []
-    x1, y1, x2, y2 = boxes[:,0], boxes[:,1], boxes[:,2], boxes[:,3]
-    area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(y2)
-    while len(idxs) > 0:
-        last = idxs[-1]
-        picked.append(last)
-        suppress = [len(idxs) - 1]
-        for pos in range(len(idxs) - 1):
-            i = idxs[pos]
-            ix1 = max(x1[i], x1[last])
-            iy1 = max(y1[i], y1[last])
-            ix2 = min(x2[i], x2[last])
-            iy2 = min(y2[i], y2[last])
-            iw = max(0, ix2 - ix1 + 1)
-            ih = max(0, iy2 - iy1 + 1)
-            overlap = (iw * ih) / area[i]
-            if overlap > overlap_thresh:
-                suppress.append(pos)
-        idxs = np.delete(idxs, suppress)
-    return [tuple(map(int, boxes[i])) for i in picked]
-
-
-def draw_matches(frame, result, threshold):
-    thresh = threshold / 100.0
-    locations = np.where(result >= thresh)
-    boxes = []
-    for pt in zip(*locations[::-1]):
-        boxes.append((pt[0], pt[1], pt[0] + tw, pt[1] + th))
-    boxes = nms(boxes, overlap_thresh=0.3)
-    for (x1, y1, x2, y2) in boxes:
-        confidence = float(result[y1, x1])
-        green = int(255 * confidence)
-        blue  = int(255 * (1 - confidence))
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (blue, green, 0), 2)
-        cv2.putText(frame, f"{confidence:.2f}", (x1, y1 - 6),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (blue, green, 0), 1)
-    return len(boxes)
-
-
-print("Q или Esc — выход, S — сохранить кадр")
+det_video    = make_detector(mp_vision.RunningMode.VIDEO, num_hands=2, det_conf=0.5)
+timestamp_ms = 0
 
 while True:
     grabbed, frame = cap.read()
     if not grabbed:
         break
 
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    # Проверка что шаблон меньше кадра
-    if tw >= fw or th >= fh:
-        cv2.putText(frame, "TEMPLATE TOO LARGE", (50, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.imshow(WINDOW, frame)
-        key = cv2.waitKey(1)
-        if key == ord('q') or key == ord('Q') or key == 27:
-            break
-        continue
-
-    result = cv2.matchTemplate(frame_gray, tmpl_gray, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(result)
-
-    heatmap = build_heatmap(result, frame.shape)
+    frame   = cv2.flip(frame, 1)
     display = frame.copy()
-    count = draw_matches(display, result, threshold_val[0])
+    timestamp_ms += 33
 
-    # Всегда рисуем лучшее совпадение отдельно (красным) даже ниже порога
-    x, y = max_loc
-    cv2.rectangle(display, (x, y), (x + tw, y + th), (0, 0, 255), 1)
-    cv2.putText(display, f"best:{max_val:.2f}", (x, y - 6),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+    result = det_video.detect_for_video(bgr_to_mp(frame), timestamp_ms)
 
-    # Миниатюра шаблона в углу
-    th_s = min(th, 80)
-    tw_s = int(tw * th_s / th)
-    tmpl_thumb = cv2.resize(template, (tw_s, th_s))
-    display[10:10+th_s, 10:10+tw_s] = tmpl_thumb
-    cv2.rectangle(display, (10, 10), (10+tw_s, 10+th_s), (255, 255, 0), 1)
-    cv2.putText(display, "template", (10, 10+th_s+14),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+    best_sim = 0.0
+    best_lms = None
 
-    status = f"Found: {count}  Best: {max_val:.2f}  Thr: {threshold_val[0]}%"
-    cv2.putText(display, status, (10, frame.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+    if result.hand_landmarks:
+        for hand_lms in result.hand_landmarks:
+            pts_px = [(int(lm.x * fw), int(lm.y * fh)) for lm in hand_lms]
+            for a, b in HAND_CONNECTIONS:
+                cv2.line(display, pts_px[a], pts_px[b], (0, 200, 255), 2)
+            for pt in pts_px:
+                cv2.circle(display, pt, 4, (255, 255, 255), -1)
 
-    blended = cv2.addWeighted(display, 0.7, heatmap, 0.3, 0)
-    cv2.imshow(WINDOW, blended)
+            sim = float(np.dot(template_vec, landmarks_to_vector(hand_lms)))
+            if sim > best_sim:
+                best_sim = sim
+                best_lms = hand_lms
 
-    key = cv2.waitKey(1)
-    if key == ord('q') or key == ord('Q') or key == 27:
+    pct   = int(max(0.0, best_sim) * 100)
+    found = pct >= threshold_val[0]
+
+    if best_lms and found:
+        xs = [lm.x * fw for lm in best_lms]
+        ys = [lm.y * fh for lm in best_lms]
+        cv2.rectangle(display,
+                      (max(0, int(min(xs))-15), max(0, int(min(ys))-15)),
+                      (min(fw, int(max(xs))+15), min(fh, int(max(ys))+15)),
+                      (0, 255, 0), 3)
+
+    bx, by, bw, bh = 10, fh-50, 250, 20
+    cv2.rectangle(display, (bx, by), (bx+bw, by+bh), (40,40,40), -1)
+    fill = int(bw * max(0.0, best_sim))
+    if fill > 0:
+        cv2.rectangle(display, (bx, by), (bx+fill, by+bh),
+                      (0,220,0) if found else (0,120,220), -1)
+    tx = bx + int(bw * threshold_val[0] / 100)
+    cv2.line(display, (tx, by-3), (tx, by+bh+3), (255,255,0), 2)
+    cv2.rectangle(display, (bx, by), (bx+bw, by+bh), (200,200,200), 1)
+    cv2.putText(display, f"{pct}%", (bx+bw+8, by+15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
+    cv2.putText(display,
+                f"FOUND! ({pct}%)" if found else f"Searching... ({pct}%)",
+                (10, fh-10), cv2.FONT_HERSHEY_SIMPLEX, 0.65,
+                (0,220,0) if found else (80,80,220), 2)
+
+    display[10:10+THUMB_H, 10:10+THUMB_W] = tmpl_thumb
+    cv2.rectangle(display, (10,10), (10+THUMB_W, 10+THUMB_H),
+                  (0,220,0) if found else (100,100,100), 2)
+    cv2.putText(display, "template", (10, 10+THUMB_H+14),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200,200,200), 1)
+
+    cv2.imshow(WINDOW, display)
+    key = cv2.waitKey(1) & 0xFF
+    if key in (ord('q'), ord('Q'), 27):
         break
-    elif key == ord('s') or key == ord('S'):
-        cv2.imwrite('found_frame.png', blended)
+    elif key in (ord('s'), ord('S')):
+        cv2.imwrite("found_frame.png", display)
         print("Сохранено: found_frame.png")
 
+det_video.close()
 cap.release()
 cv2.destroyAllWindows()
