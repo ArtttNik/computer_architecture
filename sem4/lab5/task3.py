@@ -3,17 +3,9 @@ import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
-import urllib.request
-import os
 import sys
 
 MODEL_PATH = "hand_landmarker.task"
-MODEL_URL  = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-
-if not os.path.exists(MODEL_PATH):
-    print("Скачиваю модель hand_landmarker.task (~9 МБ)...")
-    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-    print("Готово.")
 
 FINGER_TIPS  = [4, 8, 12, 16, 20]
 FINGER_MIDS  = [3, 7, 11, 15, 19]
@@ -24,7 +16,7 @@ def landmarks_to_vector(lms):
     pts = np.array([[lm.x, lm.y] for lm in lms], dtype=np.float32)
     wrist = pts[WRIST]
     scale = np.linalg.norm(pts[9] - wrist) + 1e-6
-    pts   = (pts - wrist) / scale
+    pts = (pts - wrist) / scale
 
     features = []
     for tip in FINGER_TIPS:
@@ -60,33 +52,30 @@ def bgr_to_mp(bgr):
     return mp.Image(image_format=mp.ImageFormat.SRGB,
                     data=cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
-template_img = cv2.imread("template.png")
+template_img = cv2.imread("template1.png")
 if template_img is None:
     print("Файл template1.png не найден")
     sys.exit(1)
 
-det_static   = make_detector(mp_vision.RunningMode.IMAGE, num_hands=1, det_conf=0.3)
-res_tmpl     = det_static.detect(bgr_to_mp(template_img))
+det_static = make_detector(mp_vision.RunningMode.IMAGE, num_hands=1, det_conf=0.3)
+res_tmpl = det_static.detect(bgr_to_mp(template_img))
 if not res_tmpl.hand_landmarks:
     res_tmpl = det_static.detect(bgr_to_mp(cv2.flip(template_img, 1)))
 det_static.close()
 
 if not res_tmpl.hand_landmarks:
-    print("ОШИБКА: рука в template1.png не найдена.")
-    print("Рука должна быть чётко видна на светлом фоне.")
+    print("Рука в шаблоне не найдена")
     sys.exit(1)
 
 template_vec = landmarks_to_vector(res_tmpl.hand_landmarks[0])
-print(f"Шаблон загружен OK, точек: {len(res_tmpl.hand_landmarks[0])}")
 
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
-    print("Камера не найдена"); sys.exit(1)
+    print("Камера не найдена")
+    sys.exit(1)
 
 grabbed, frame = cap.read()
 fh, fw = frame.shape[:2]
-print(f"Камера: {fw}x{fh}")
-print("Q/Esc — выход   S — сохранить кадр")
 
 WINDOW = "Gesture Search"
 cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
@@ -106,7 +95,7 @@ HAND_CONNECTIONS = [
     (13,17),(17,18),(18,19),(19,20),(0,17)
 ]
 
-det_video    = make_detector(mp_vision.RunningMode.VIDEO, num_hands=2, det_conf=0.5)
+det_video = make_detector(mp_vision.RunningMode.VIDEO, num_hands=2, det_conf=0.5)
 timestamp_ms = 0
 
 while True:
@@ -114,7 +103,7 @@ while True:
     if not grabbed:
         break
 
-    frame   = cv2.flip(frame, 1)
+    frame = cv2.flip(frame, 1)
     display = frame.copy()
     timestamp_ms += 33
 
@@ -136,7 +125,7 @@ while True:
                 best_sim = sim
                 best_lms = hand_lms
 
-    pct   = int(max(0.0, best_sim) * 100)
+    pct = int(max(0.0, best_sim) * 100)
     found = pct >= threshold_val[0]
 
     if best_lms and found:
@@ -175,7 +164,6 @@ while True:
         break
     elif key in (ord('s'), ord('S')):
         cv2.imwrite("found_frame.png", display)
-        print("Сохранено: found_frame.png")
 
 det_video.close()
 cap.release()

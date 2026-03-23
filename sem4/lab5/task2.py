@@ -28,7 +28,7 @@ while True:
         break
 
     if blur_value == 1:
-        result = sharpen(frame)
+        result = cv2.medianBlur(frame, 5)  # радиус 5
     else:
         result = cv2.GaussianBlur(frame, (blur_value, blur_value), 0)
 
