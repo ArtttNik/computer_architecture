@@ -7,7 +7,7 @@
 #define EFFECT_TREMOLO     2
 #define EFFECT_HIGHPASS    3
 
-#define EFFECT_MODE 2
+#define EFFECT_MODE 3
 
 #define ENABLE_3D 1
 
