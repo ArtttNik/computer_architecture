@@ -15,7 +15,7 @@ void task1() {
     cout << "\n=== TASK 1 ===\n";
     cout << "parallel for:\n";
 
-#pragma omp parallel for
+#pragma omp parallel for shedule static 4
     for (int i = 0; i < 100; i++) {
         cout << 0;
         func();

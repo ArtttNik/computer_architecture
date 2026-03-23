@@ -52,9 +52,9 @@ def bgr_to_mp(bgr):
     return mp.Image(image_format=mp.ImageFormat.SRGB,
                     data=cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
-template_img = cv2.imread("template1.png")
+template_img = cv2.imread("template.png")
 if template_img is None:
-    print("Файл template1.png не найден")
+    print("Файл template.png не найден")
     sys.exit(1)
 
 det_static = make_detector(mp_vision.RunningMode.IMAGE, num_hands=1, det_conf=0.3)

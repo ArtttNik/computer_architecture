@@ -3,12 +3,12 @@
 #include <fmod.h>
 #include <fmod_errors.h>
 
+#define EFFECT_NONE        0
 #define EFFECT_ECHO        1
 #define EFFECT_TREMOLO     2
 #define EFFECT_HIGHPASS    3
 
-#define EFFECT_MODE 3
-
+#define EFFECT_MODE 0
 #define ENABLE_3D 1
 
 int main() {
@@ -67,13 +67,9 @@ int main() {
 
 #if EFFECT_MODE == EFFECT_ECHO
     FMOD_System_CreateDSPByType(system, FMOD_DSP_TYPE_ECHO, &dsp);
-#endif
-
-#if EFFECT_MODE == EFFECT_TREMOLO
+#elif EFFECT_MODE == EFFECT_TREMOLO
     FMOD_System_CreateDSPByType(system, FMOD_DSP_TYPE_TREMOLO, &dsp);
-#endif
-
-#if EFFECT_MODE == EFFECT_HIGHPASS
+#elif EFFECT_MODE == EFFECT_HIGHPASS
     FMOD_System_CreateDSPByType(system, FMOD_DSP_TYPE_HIGHPASS, &dsp);
 #endif
 
@@ -104,7 +100,7 @@ int main() {
         FMOD_Channel_IsPlaying(channel, &playing);
         FMOD_System_Update(system);
 
-        t += 0.02f;
+        t += 0.0000005f;
     }
 
     if (dsp) FMOD_DSP_Release(dsp);
