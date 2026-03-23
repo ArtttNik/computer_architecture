@@ -1,4 +1,4 @@
-#include <omp.h>
+﻿#include <omp.h>
 #include <iostream>
 #include <vector>
 #include <cstdlib>
@@ -77,7 +77,7 @@ void task3() {
     cout << "\n= TASK 3 =\n";
 
     const int N = 20;
-    int arr[N] = {0};
+    int arr[N] = { 0 };
     global_counter = 0;
 
     omp_set_num_threads(2);
@@ -89,8 +89,8 @@ void task3() {
 #pragma omp atomic
         global_counter++;
         cout << "[Thread " << omp_get_thread_num()
-             << "] arr[" << i << "]=" << arr[i]
-             << "  counter=" << global_counter << "\n";
+            << "] arr[" << i << "]=" << arr[i]
+            << "  counter=" << global_counter << "\n";
     }
     cout << "Final counter (must be " << N << "): " << global_counter << "\n";
     cout << "\n--- Directive ORDERED ---\n";
@@ -100,7 +100,7 @@ void task3() {
 #pragma omp ordered
         {
             cout << "[Thread " << omp_get_thread_num()
-                 << "] i=" << i << "  val=" << val << "\n";
+                << "] i=" << i << "  val=" << val << "\n";
         }
     }
 }
@@ -128,7 +128,7 @@ void task4() {
             if (write_index < N) {
                 shared_array[write_index] = tid * 10 + i;
                 cout << "[Thread " << tid << "] write arr["
-                     << write_index << "] = " << shared_array[write_index] << "\n";
+                    << write_index << "] = " << shared_array[write_index] << "\n";
                 write_index++;
             }
 
@@ -140,7 +140,8 @@ void task4() {
     if (omp_test_lock(&lock)) {
         cout << "Lock acquired successfully (test_lock returned true)\n";
         omp_unset_lock(&lock);
-    } else {
+    }
+    else {
         cout << "Lock is busy, skipping...\n";
     }
 
@@ -164,12 +165,12 @@ int main() {
         cin >> choice;
 
         switch (choice) {
-            case 1: task1(); break;
-            case 2: task2(); break;
-            case 3: task3(); break;
-            case 4: task4(); break;
-            case 0: cout << "end\n"; break;
-            default: cout << "wrong\n"; break;
+        case 1: task1(); break;
+        case 2: task2(); break;
+        case 3: task3(); break;
+        case 4: task4(); break;
+        case 0: cout << "end\n"; break;
+        default: cout << "wrong\n"; break;
         }
     }
 
