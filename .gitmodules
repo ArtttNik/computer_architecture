@@ -1,0 +1,3 @@
+[submodule "sem4/course_work"]
+	path = sem4/course_work
+	url = https://github.com/ArtttNik/disease_detector_ai
