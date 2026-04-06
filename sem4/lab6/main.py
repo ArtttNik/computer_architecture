@@ -19,7 +19,7 @@ def main():
         print("Некорректное число")
         return
 
-    base, ext = os.path.splitext(input_file)
+    base, _ = os.path.splitext(input_file)
     output_file = f"{base}_denoised.mp4"
 
     try:
@@ -29,13 +29,10 @@ def main():
         print(f"Ошибка анализа: {e.stderr.decode()}")
         return
 
-    s = strength * 3
-    p = 5
-    r = 11
-
     stream = ffmpeg.input(input_file)
-    video = stream.video.filter("nlmeans", s=s, p=p, r=r)
-    #video = stream.video.filter("hqdn3d", luma_spatial=strength*2, chroma_spatial=strength, luma_temporal=3, chroma_temporal=2)
+    s = round(1.0 + (strength - 1) * 0.9, 1)
+    video = stream.video.filter("nlmeans", s=s, p=5, r=5)
+
     if has_audio:
         out = ffmpeg.output(
             video, stream.audio, output_file,
@@ -51,7 +48,8 @@ def main():
         ffmpeg.run(out, overwrite_output=True)
         print(f"Готово → {output_file}")
     except ffmpeg.Error as e:
-        print(f"Ошибка ffmpeg: {e.stderr.decode()}")
+        stderr = e.stderr.decode() if e.stderr else str(e)
+        print(f"Ошибка ffmpeg: {stderr}")
 
 if __name__ == "__main__":
     main()
