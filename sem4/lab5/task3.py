@@ -52,7 +52,7 @@ def bgr_to_mp(bgr):
     return mp.Image(image_format=mp.ImageFormat.SRGB,
                     data=cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
-template_img = cv2.imread("template.png")
+template_img = cv2.imread("template1.png")
 if template_img is None:
     print("Файл template.png не найден")
     sys.exit(1)
